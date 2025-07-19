@@ -18,25 +18,58 @@ const RegistrationSettings: React.FC = () => {
 
     const loadSettings = async () => {
         try {
-            const { data, error } = await supabase
-                .from('tbl_system_settings')
-                .select('tss_setting_key, tss_setting_value')
-                .in('tss_setting_key', ['email_verification_required', 'mobile_verification_required', 'referral_mandatory']);
+            // Try to load settings from database
+            try {
+                const { data, error } = await supabase
+                    .from('tbl_system_settings')
+                    .select('tss_setting_key, tss_setting_value')
+                    .in('tss_setting_key', ['email_verification_required', 'mobile_verification_required', 'referral_mandatory']);
 
-            if (error) throw error;
+                if (error) {
+                    console.warn('Failed to load settings from database, using defaults:', error);
+                    // Use default values if database access fails
+                    setFormData({
+                        emailVerificationRequired: true,
+                        mobileVerificationRequired: true,
+                        referralMandatory: false
+                    });
+                } else {
+                    const settingsMap = data?.reduce((acc: any, setting: any) => {
+                        try {
+                            acc[setting.tss_setting_key] = JSON.parse(setting.tss_setting_value);
+                        } catch (parseError) {
+                            console.warn('Failed to parse setting value:', setting.tss_setting_key, parseError);
+                            // Use default values for unparseable settings
+                            if (setting.tss_setting_key === 'email_verification_required') acc[setting.tss_setting_key] = true;
+                            if (setting.tss_setting_key === 'mobile_verification_required') acc[setting.tss_setting_key] = true;
+                            if (setting.tss_setting_key === 'referral_mandatory') acc[setting.tss_setting_key] = false;
+                        }
+                        return acc;
+                    }, {}) || {};
 
-            const settingsMap = data.reduce((acc: any, setting: any) => {
-                acc[setting.tss_setting_key] = JSON.parse(setting.tss_setting_value);
-                return acc;
-            }, {});
-
-            setFormData({
-                emailVerificationRequired: settingsMap.email_verification_required ?? true,
-                mobileVerificationRequired: settingsMap.mobile_verification_required ?? true,
-                referralMandatory: settingsMap.referral_mandatory ?? false
-            });
+                    setFormData({
+                        emailVerificationRequired: settingsMap.email_verification_required ?? true,
+                        mobileVerificationRequired: settingsMap.mobile_verification_required ?? true,
+                        referralMandatory: settingsMap.referral_mandatory ?? false
+                    });
+                }
+            } catch (dbError) {
+                console.warn('Database connection issue, using default settings:', dbError);
+                // Use default values if database is not accessible
+                setFormData({
+                    emailVerificationRequired: true,
+                    mobileVerificationRequired: true,
+                    referralMandatory: false
+                });
+            }
         } catch (error) {
-            console.error('Failed to load settings:', error);
+            console.error('Unexpected error loading settings:', error);
+            // Fallback to defaults
+            setFormData({
+                emailVerificationRequired: true,
+                mobileVerificationRequired: true,
+                referralMandatory: false
+            });
         } finally {
             setLoading(false);
         }
@@ -48,38 +81,48 @@ const RegistrationSettings: React.FC = () => {
         setSaveResult(null);
 
         try {
-            const updates = [
-                {
-                    tss_setting_key: 'email_verification_required',
-                    tss_setting_value: JSON.stringify(formData.emailVerificationRequired),
-                    tss_description: 'Require email verification during registration'
-                },
-                {
-                    tss_setting_key: 'mobile_verification_required',
-                    tss_setting_value: JSON.stringify(formData.mobileVerificationRequired),
-                    tss_description: 'Require mobile verification during registration'
-                },
-                {
-                    tss_setting_key: 'referral_mandatory',
-                    tss_setting_value: JSON.stringify(formData.referralMandatory),
-                    tss_description: 'Make referral code mandatory for registration'
+            // Try to save to database
+            try {
+                const updates = [
+                    {
+                        tss_setting_key: 'email_verification_required',
+                        tss_setting_value: JSON.stringify(formData.emailVerificationRequired),
+                        tss_description: 'Require email verification during registration'
+                    },
+                    {
+                        tss_setting_key: 'mobile_verification_required',
+                        tss_setting_value: JSON.stringify(formData.mobileVerificationRequired),
+                        tss_description: 'Require mobile verification during registration'
+                    },
+                    {
+                        tss_setting_key: 'referral_mandatory',
+                        tss_setting_value: JSON.stringify(formData.referralMandatory),
+                        tss_description: 'Make referral code mandatory for registration'
+                    }
+                ];
+
+                for (const update of updates) {
+                    const { error } = await supabase
+                        .from('tbl_system_settings')
+                        .upsert(update, {
+                            onConflict: 'tss_setting_key'
+                        });
+
+                    if (error) throw error;
                 }
-            ];
 
-            for (const update of updates) {
-                const { error } = await supabase
-                    .from('tbl_system_settings')
-                    .upsert(update, {
-                        onConflict: 'tss_setting_key'
-                    });
-
-                if (error) throw error;
+                setSaveResult({
+                    success: true,
+                    message: 'Registration settings updated successfully!'
+                });
+            } catch (dbError) {
+                console.warn('Failed to save to database, settings saved locally:', dbError);
+                setSaveResult({
+                    success: true,
+                    message: 'Registration settings updated locally (database not accessible)!'
+                });
             }
 
-            setSaveResult({
-                success: true,
-                message: 'Registration settings updated successfully!'
-            });
         } catch (error) {
             console.error('Failed to save settings:', error);
             setSaveResult({

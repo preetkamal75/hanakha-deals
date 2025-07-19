@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import { useNavigate } from 'react-router-dom';
 import GeneralSettings from '../../components/admin/GeneralSettings';
 import RegistrationSettings from '../../components/admin/RegistrationSettings';
 import CustomerManagement from '../../components/admin/CustomerManagement';
@@ -24,7 +25,8 @@ import {
   Check,
   X,
   Globe,
-  UserCheck
+  UserCheck,
+  LogOut
 } from 'lucide-react';
 
 interface SubAdmin {
@@ -39,7 +41,8 @@ interface SubAdmin {
 }
 
 const AdminDashboard: React.FC = () => {
-  const { admin, hasPermission, getSubAdmins, createSubAdmin, updateSubAdmin, deleteSubAdmin, resetSubAdminPassword } = useAdminAuth();
+  const { admin, hasPermission, getSubAdmins, createSubAdmin, updateSubAdmin, deleteSubAdmin, resetSubAdminPassword, logout } = useAdminAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [subAdmins, setSubAdmins] = useState<SubAdmin[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -137,6 +140,11 @@ const AdminDashboard: React.FC = () => {
     }));
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate('/backpanel/login');
+  };
+
   const stats = [
     {
       title: 'Total Users',
@@ -203,11 +211,20 @@ const AdminDashboard: React.FC = () => {
                   Welcome back, {admin?.fullName}! ({admin?.role === 'super_admin' ? 'Super Admin' : 'Sub Admin'})
                 </p>
               </div>
-              <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-4 py-2 rounded-xl">
-                <div className="flex items-center space-x-2">
-                  <Shield className="h-5 w-5" />
-                  <span className="font-medium">Admin Panel</span>
+              <div className="flex items-center space-x-4">
+                <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-4 py-2 rounded-xl">
+                  <div className="flex items-center space-x-2">
+                    <Shield className="h-5 w-5" />
+                    <span className="font-medium">Admin Panel</span>
+                  </div>
                 </div>
+                <button
+                  onClick={handleLogout}
+                  className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-xl transition-colors flex items-center space-x-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </button>
               </div>
             </div>
           </div>
@@ -301,12 +318,12 @@ const AdminDashboard: React.FC = () => {
                   <div>
                     {/* Settings Sub-tabs */}
                     <div className="mb-6">
-                      <nav className="flex space-x-8">
+                      <nav className="flex space-x-8 overflow-x-auto">
                         {settingsTabs.map((tab) => (
                             <button
                                 key={tab.id}
                                 onClick={() => setSettingsTab(tab.id)}
-                                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
+                                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                                     settingsTab === tab.id
                                         ? 'border-blue-500 text-blue-600'
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -328,6 +345,10 @@ const AdminDashboard: React.FC = () => {
               )}
 
               {/* Other tabs content */}
+              {activeTab === 'users' && hasPermission('users', 'read') && (
+                  <CustomerManagement />
+              )}
+
               {activeTab !== 'overview' && activeTab !== 'admins' && activeTab !== 'users' && activeTab !== 'settings' && (
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
