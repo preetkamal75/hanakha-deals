@@ -3,8 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 // Use fallback values for demo purposes when environment variables are not available
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://demo.supabase.co'
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'demo-key'
-console.log(supabaseUrl);
-console.log(supabaseAnonKey);
+
 // Only log in development
 if (import.meta.env.DEV) {
   console.log('Environment check:', {

@@ -69,18 +69,18 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const [smsGateway, setSMSGateway] = useState<SMSGateway>({
-    provider: 'Twilio',
+    provider: 'Twilio (via Supabase)',
     apiKey: '',
     apiSecret: '',
     senderId: 'MLM-PLATFORM'
   });
 
   const [emailSMTP, setEmailSMTP] = useState<EmailSMTP>({
-    host: 'smtp.gmail.com', // or smtp.hostinger.com for Hostinger
-    port: 587, // 465 for SSL, 587 for TLS
-    username: '', // Your Gmail email or Hostinger email
-    password: '', // Gmail App Password or Hostinger email password
-    encryption: 'TLS' // TLS or SSL
+    host: 'Resend.com (via Supabase)',
+    port: 587,
+    username: '',
+    password: '',
+    encryption: 'TLS'
   });
 
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([
@@ -138,8 +138,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   return (
-    <AdminContext.Provider value={value}>
-      {children}
-    </AdminContext.Provider>
+      <AdminContext.Provider value={value}>
+        {children}
+      </AdminContext.Provider>
   );
 };
