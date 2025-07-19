@@ -81,7 +81,6 @@ export const sessionManager = {
         sessionManager.removeSession();
       }
     }
-    console.log('❌ No valid session found in sessionStorage');
     return null;
   },
 

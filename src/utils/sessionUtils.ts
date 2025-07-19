@@ -63,6 +63,19 @@ export const sessionUtils = {
     sessionStorage.removeItem('admin_session_token');
   },
 
+  // Check if current page is a login page
+  isOnLoginPage: (): boolean => {
+    if (typeof window === 'undefined') return false;
+    const path = window.location.pathname;
+    return path.includes('/login') || path.includes('/register') || path.includes('/forgot-password') || path.includes('/reset-password');
+  },
+
+  // Check if current page is admin area
+  isInAdminArea: (): boolean => {
+    if (typeof window === 'undefined') return false;
+    return window.location.pathname.startsWith('/backpanel');
+  },
+
   // Session event listeners for tab/window events
   setupSessionListeners: () => {
     // Clear session when tab/window is closed
@@ -74,22 +87,55 @@ export const sessionUtils = {
     // Handle visibility change (tab switching)
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        // Check session validity when tab becomes visible
-        const sessionInfo = sessionUtils.getSessionInfo();
-        if (!sessionInfo.isValid) {
-          sessionUtils.clearAllSessions();
-          // Optionally redirect to login
-          window.location.href = '/customer/login';
+        // Only check session if not on login pages
+        if (!sessionUtils.isOnLoginPage()) {
+          // Check session validity when tab becomes visible
+          const sessionInfo = sessionUtils.getSessionInfo();
+          const adminSessionToken = sessionStorage.getItem('admin_session_token');
+          
+          // For admin area, check admin session
+          if (sessionUtils.isInAdminArea()) {
+            if (!adminSessionToken) {
+              // Only redirect if not already on admin login page
+              if (window.location.pathname !== '/backpanel/login') {
+                window.location.href = '/backpanel/login';
+              }
+            }
+          } else {
+            // For customer area, check Supabase session
+            if (!sessionInfo.isValid) {
+              // Only clear sessions and redirect if user was actually logged in before
+              // and not on a public page
+              const isPublicPage = ['/', '/about', '/contact', '/faq', '/policies', '/join-customer', '/join-company', '/subscription-plans'].includes(window.location.pathname);
+              
+              if (!isPublicPage) {
+                sessionUtils.clearAllSessions();
+                window.location.href = '/customer/login';
+              }
+            }
+          }
         }
       }
     });
 
     // Handle storage events (for multi-tab synchronization)
     window.addEventListener('storage', (e) => {
-      if (e.key === 'supabase-session' && e.newValue === null) {
-        // Session was cleared in another tab
-        sessionUtils.clearAllSessions();
-        window.location.href = '/customer/login';
+      if (e.key === 'supabase-session' && e.newValue === null && !sessionUtils.isOnLoginPage()) {
+        // Session was cleared in another tab, only redirect if not on login page
+        if (!sessionUtils.isInAdminArea()) {
+          sessionUtils.clearAllSessions();
+          const isPublicPage = ['/', '/about', '/contact', '/faq', '/policies', '/join-customer', '/join-company', '/subscription-plans'].includes(window.location.pathname);
+          if (!isPublicPage) {
+            window.location.href = '/customer/login';
+          }
+        }
+      }
+      
+      if (e.key === 'admin_session_token' && e.newValue === null && sessionUtils.isInAdminArea() && !sessionUtils.isOnLoginPage()) {
+        // Admin session was cleared in another tab
+        if (window.location.pathname !== '/backpanel/login') {
+          window.location.href = '/backpanel/login';
+        }
       }
     });
   }

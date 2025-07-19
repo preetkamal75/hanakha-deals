@@ -1,7 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
-import { sessionUtils } from '../../utils/sessionUtils';
 
 interface AdminProtectedRouteProps {
   children: React.ReactNode;
@@ -20,7 +19,8 @@ const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({
   // Check if admin session exists in sessionStorage
   const adminSessionToken = typeof window !== 'undefined' ? sessionStorage.getItem('admin_session_token') : null;
   
-  if (!loading && !admin && !adminSessionToken) {
+  // Only redirect if we're sure there's no valid session
+  if (!loading && !admin && (!adminSessionToken || adminSessionToken === 'null' || adminSessionToken === 'undefined')) {
     return <Navigate to="/backpanel/login" replace />;
   }
 

@@ -76,6 +76,13 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const validateSession = async (sessionToken: string) => {
     try {
+      // Check if session token is valid format and not expired
+      if (!sessionToken || sessionToken === 'null' || sessionToken === 'undefined') {
+        sessionStorage.removeItem('admin_session_token');
+        setLoading(false);
+        return;
+      }
+
       // In demo mode, create a mock admin user
       const mockAdmin: AdminUser = {
         id: 'admin-1',
