@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { sessionManager } from '../lib/supabase';
+import { supabase, sessionManager } from '../lib/supabase';
 import { useNotification } from '../components/ui/NotificationProvider';
 
 interface AdminUser {
@@ -114,39 +114,84 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const login = async (email: string, password: string) => {
     try {
-      // Demo mode login
-      if (email === 'admin@mlmplatform.com' && password === 'Admin@123456') {
-        const sessionToken = 'demo-admin-session-' + Date.now();
-        sessionStorage.setItem('admin_session_token', sessionToken);
-        
-        const mockAdmin: AdminUser = {
-          id: 'admin-1',
-          email: 'admin@mlmplatform.com',
-          fullName: 'Super Administrator',
-          role: 'super_admin',
-          permissions: {
-            users: { read: true, write: true, delete: true },
-            companies: { read: true, write: true, delete: true },
-            subscriptions: { read: true, write: true, delete: true },
-            payments: { read: true, write: true, delete: true },
-            settings: { read: true, write: true, delete: true },
-            admins: { read: true, write: true, delete: true },
-            reports: { read: true, write: true, delete: true }
-          },
-          isActive: true,
-          lastLogin: new Date().toISOString(),
-          createdAt: new Date().toISOString()
-        };
-        
-        setAdmin(mockAdmin);
-        notification.showSuccess('Welcome Back!', 'Successfully logged into admin panel.');
-        return;
-      }
-      
-      throw new Error('Invalid credentials');
-    } catch (error) {
-      notification.showError('Login Failed', error.message || 'Invalid email or password');
-      throw error;
+    console.log('🔍 Starting admin login process for:', email);
+   
+    // Try to get admin user from database
+    const { data: user, error } = await supabase
+      .from('tbl_admin_users')
+      .select('*')
+      .eq('tau_email', email.trim())
+      .single();
+
+    if (error || !user) {
+      console.log('❌ Admin user not found in database:', error?.message);
+      throw new Error('Invalid email or password');
+    }
+
+    if (!user.tau_is_active) {
+      throw new Error('Account is inactive. Please contact the administrator.');
+    }
+
+    console.log('🔐 Verifying password...');
+    
+    // Handle default admin credentials and bcrypt verification
+    let passwordMatch = false;
+    
+    // Check if this is the default admin with placeholder hash
+    
+    // Try bcrypt verification for other accounts
+    try {
+      const bcrypt = await import('bcryptjs');
+      passwordMatch = await bcrypt.compare(password, user.tau_password_hash);
+      console.log('✅ Using bcrypt for password verification');
+      console.log('password: ', password );
+      console.log('user.tau_password_hash: ', user.tau_password_hash);
+    } catch (bcryptError) {
+      console.log('⚠️ bcrypt not available, using fallback verification');
+      // Fallback: direct comparison (not secure for production)
+      passwordMatch = password === user.tau_password_hash;
+    }
+    
+
+    if (!passwordMatch) {
+      console.log('❌ Password verification failed');
+      throw new Error('Invalid email or password');
+    }
+
+    console.log('✅ Password verified successfully');
+
+    // All checks passed — login success
+    const sessionToken = `admin-session-${user.tau_id}-${Date.now()}`;
+    sessionStorage.setItem('admin_session_token', sessionToken);
+
+    const adminUser: AdminUser = {
+      id: user.tau_id,
+      email: user.tau_email,
+      fullName: user.tau_full_name,
+      role: user.tau_role,
+      permissions: user.tau_permissions,
+      isActive: user.tau_is_active,
+      lastLogin: user.tau_last_login || '',
+      createdAt: user.tau_created_at || ''
+    };
+
+    setAdmin(adminUser);
+
+    // Update last login
+    try {
+      await supabase
+      .from('tbl_admin_users')
+      .update({ tau_last_login: new Date().toISOString() })
+      .eq('tau_id', user.tau_id);
+    } catch (updateError) {
+      console.warn('Failed to update last login time:', updateError);
+    }
+
+    notification.showSuccess('Welcome Back!', 'You have successfully logged in.');
+  } catch (error: any) {
+    console.error('❌ Admin login failed:', error);
+    notification.showError('Login Failed', error.message || 'Invalid email or password');
+    throw error;
     }
   };
 
@@ -174,7 +219,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         createdBy: admin!.id,
         createdAt: new Date().toISOString()
       };
-      
+       
       // Simulate sending email with credentials
       console.log('Email would be sent to:', data.email);
       console.log('Temporary password:', tempPassword);

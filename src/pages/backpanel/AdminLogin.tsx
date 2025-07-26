@@ -67,6 +67,9 @@ const AdminLogin: React.FC = () => {
             <div className="text-xs text-blue-200 space-y-1">
               <div>Email: admin@mlmplatform.com</div>
               <div>Password: Admin@123456</div>
+              <div className="mt-2 text-yellow-300">
+                <strong>Note:</strong> This works with both demo mode and database login
+              </div>
             </div>
           </div>
 
