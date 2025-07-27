@@ -147,7 +147,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.log('password: ', password );
       console.log('user.tau_password_hash: ', user.tau_password_hash);
     } catch (bcryptError) {
-      console.log('⚠️ bcrypt not available, using fallback verification');
+      console.log('⚠️ bcrypt not available, using fallback verification', bcryptError);
       // Fallback: direct comparison (not secure for production)
       passwordMatch = password === user.tau_password_hash;
     }
