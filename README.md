@@ -79,6 +79,11 @@ Create a `.env` file in the root directory:
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Optional: Redis Configuration (for MLM tree optimization)
+VITE_REDIS_HOST=your_redis_host
+VITE_REDIS_PORT=6379
+VITE_REDIS_PASSWORD=your_redis_password
 ```
 
 ### 3. SMS & Email Gateway Configuration

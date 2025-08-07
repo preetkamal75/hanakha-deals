@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdmin } from '../../contexts/AdminContext';
-import { sendOTP } from '../../lib/supabase';
+import { sendOTP, checkSponsorshipNumberExists } from '../../lib/supabase';
 import { Eye, EyeOff, User, Mail, Phone, Users } from 'lucide-react';
 import ReCaptcha from '../../components/ui/ReCaptcha';
 
@@ -33,6 +33,8 @@ const CustomerRegister: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [validatingReferral, setValidatingReferral] = useState(false);
+  const [referralValid, setReferralValid] = useState<boolean | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +65,25 @@ const CustomerRegister: React.FC = () => {
       setError('Referral account is mandatory');
       setIsSubmitting(false);
       return;
+    }
+
+    // Validate referral code if provided
+    if (formData.parentAccount) {
+      console.log('🔍 Validating referral code:', formData.parentAccount);
+      try {
+        const isValidReferral = await checkSponsorshipNumberExists(formData.parentAccount);
+        if (!isValidReferral) {
+          setError('Invalid referral code. Please check and try again.');
+          setIsSubmitting(false);
+          return;
+        }
+        console.log('✅ Referral code is valid');
+      } catch (referralError) {
+        console.error('❌ Failed to validate referral code:', referralError);
+        setError('Unable to validate referral code at this time. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
     }
 
     try {
@@ -107,7 +128,42 @@ const CustomerRegister: React.FC = () => {
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }));
+    
+    // Reset referral validation when parent account changes
+    if (name === 'parentAccount') {
+      setReferralValid(null);
+    }
   };
+
+  // Function to validate referral code
+  const validateReferralCode = async (referralCode: string) => {
+    if (!referralCode.trim()) {
+      setReferralValid(null);
+      return;
+    }
+    
+    setValidatingReferral(true);
+    try {
+      const isValid = await checkSponsorshipNumberExists(referralCode);
+      setReferralValid(isValid);
+    } catch (error) {
+      console.error('Failed to validate referral code:', error);
+      setReferralValid(false);
+    } finally {
+      setValidatingReferral(false);
+    }
+  };
+
+  // Debounced referral validation
+  React.useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (formData.parentAccount) {
+        validateReferralCode(formData.parentAccount);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.parentAccount]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -253,7 +309,33 @@ const CustomerRegister: React.FC = () => {
                     className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     placeholder="Referral ID"
                   />
+                  {/* Validation indicator */}
+                  {formData.parentAccount && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                      {validatingReferral ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                      ) : referralValid === true ? (
+                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                          <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      ) : referralValid === false ? (
+                        <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center">
+                          <svg className="w-3 h-3 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
+                {formData.parentAccount && referralValid === false && (
+                  <p className="text-xs text-red-600 mt-1">Invalid referral code</p>
+                )}
+                {formData.parentAccount && referralValid === true && (
+                  <p className="text-xs text-green-600 mt-1">Valid referral code ✓</p>
+                )}
               </div>
 
               <div>

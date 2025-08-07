@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase, sendOTP, verifyOTP as verifyOTPAPI, sessionManager } from '../lib/supabase';
+import { supabase, sendOTP, verifyOTP as verifyOTPAPI, sessionManager, addUserToMLMTree } from '../lib/supabase';
 import { useNotification } from '../components/ui/NotificationProvider';
 
 interface User {
@@ -291,6 +291,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           throw new Error(regError.message);
         }
         console.log('✅ Customer profile created successfully');
+        
+        // Add user to MLM tree if parent account is provided
+        if (userData.parentAccount) {
+          try {
+            console.log('🌳 Adding user to MLM tree with sponsor:', userData.parentAccount);
+            
+            // Get the user's sponsorship number from the profile we just created
+            const { data: profileData, error: profileError } = await supabase
+              .from('tbl_user_profiles')
+              .select('tup_sponsorship_number')
+              .eq('tup_user_id', authData.user.id)
+              .single();
+            
+            if (profileError) {
+              console.error('❌ Could not get sponsorship number for MLM tree placement:', profileError);
+              throw profileError;
+            }
+            
+            if (profileData?.tup_sponsorship_number) {
+              console.log('📝 Attempting MLM tree placement with:', {
+                userId: authData.user.id,
+                sponsorshipNumber: profileData.tup_sponsorship_number,
+                sponsorSponsorshipNumber: userData.parentAccount
+              });
+              
+              const treeResult = await addUserToMLMTree(
+                authData.user.id,
+                profileData.tup_sponsorship_number,
+                userData.parentAccount
+              );
+              
+              if (treeResult?.success) {
+                console.log('✅ MLM tree placement successful:', {
+                  position: treeResult.position,
+                  level: treeResult.level,
+                  parentId: treeResult.parent_id
+                });
+              } else {
+                console.error('❌ MLM tree placement failed:', treeResult);
+                throw new Error(treeResult?.error || 'MLM tree placement failed');
+              }
+            } else {
+              console.error('❌ Sponsorship number not found after profile creation');
+              throw new Error('Sponsorship number not generated');
+            }
+          } catch (treeError) {
+            console.error('❌ MLM tree placement failed:', treeError);
+            // For now, don't fail registration if tree placement fails
+            // In production, you might want to fail registration or retry
+            console.warn('⚠️ Registration completed but MLM tree placement failed');
+          }
+        }
       } else if (userType === 'company') {
         console.log('📝 Registering company profile...');
         const { error: regError } = await supabase.rpc('register_company', {

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMLM } from '../../contexts/MLMContext';
+import BinaryTreeVisualizer from '../../components/mlm/BinaryTreeVisualizer';
+import ReferralLinkGenerator from '../../components/mlm/ReferralLinkGenerator';
 import { 
   Users, 
   TrendingUp, 
@@ -14,22 +16,44 @@ import {
 
 const CustomerDashboard: React.FC = () => {
   const { user } = useAuth();
-  const { getUserPosition, getDownline, getUpline } = useMLM();
+  const { treeData, loading: treeLoading, getUserPosition, getDownline, getUpline, getTreeStats, loadTreeData } = useMLM();
   const [activeTab, setActiveTab] = useState('overview');
+  const [treeStats, setTreeStats] = useState({
+    totalDownline: 0,
+    leftSideCount: 0,
+    rightSideCount: 0,
+    directReferrals: 0,
+    maxDepth: 0,
+    activeMembers: 0
+  });
+
+  // Load tree data when component mounts
+  React.useEffect(() => {
+    if (user?.id) {
+      loadTreeData(user.id);
+      loadTreeStats();
+    }
+  }, [user?.id]);
+
+  const loadTreeStats = async () => {
+    if (user?.id) {
+      try {
+        const stats = await getTreeStats(user.id);
+        setTreeStats(stats);
+      } catch (error) {
+        console.error('Failed to load tree stats:', error);
+      }
+    }
+  };
 
   const userPosition = getUserPosition(user?.id || '');
   const downline = getDownline(userPosition?.id || '');
   const upline = getUpline(userPosition?.id || '');
 
-  // Mock statistics for demonstration
-  const mockStats = {
-    referrals: 24
-  };
-
   const stats = [
     {
       title: 'Total Referrals',
-      value: downline.length,
+      value: treeStats.totalDownline || downline.length,
       icon: Users,
       color: 'bg-blue-500',
       change: '+12%'
@@ -43,7 +67,7 @@ const CustomerDashboard: React.FC = () => {
     },
     {
       title: 'Current Level',
-      value: userPosition?.level || 0,
+      value: userPosition?.level || treeStats.maxDepth || 0,
       icon: TrendingUp,
       color: 'bg-purple-500',
       change: 'Level up!'
@@ -116,8 +140,9 @@ const CustomerDashboard: React.FC = () => {
               {[
                 { id: 'overview', label: 'Overview', icon: BarChart3 },
                 { id: 'network', label: 'My Network', icon: Users },
+                { id: 'tree', label: 'Binary Tree', icon: Eye },
                 { id: 'earnings', label: 'Earnings', icon: DollarSign },
-                { id: 'genealogy', label: 'Genealogy', icon: Eye }
+                { id: 'referrals', label: 'Referral Links', icon: Users }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -178,23 +203,78 @@ const CustomerDashboard: React.FC = () => {
             {activeTab === 'network' && (
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Network Overview</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                   <div className="bg-blue-50 p-6 rounded-lg">
                     <h4 className="font-semibold text-blue-900">Direct Referrals</h4>
-                    <p className="text-2xl font-bold text-blue-600 mt-2">8</p>
+                    <p className="text-2xl font-bold text-blue-600 mt-2">{treeStats.directReferrals || 0}</p>
                   </div>
                   <div className="bg-green-50 p-6 rounded-lg">
                     <h4 className="font-semibold text-green-900">Total Network</h4>
-                    <p className="text-2xl font-bold text-green-600 mt-2">{mockStats.referrals}</p>
+                    <p className="text-2xl font-bold text-green-600 mt-2">{treeStats.totalDownline || 0}</p>
                   </div>
                   <div className="bg-purple-50 p-6 rounded-lg">
-                    <h4 className="font-semibold text-purple-900">Active Members</h4>
-                    <p className="text-2xl font-bold text-purple-600 mt-2">{Math.floor(mockStats.referrals * 0.8)}</p>
+                    <h4 className="font-semibold text-purple-900">Left Side</h4>
+                    <p className="text-2xl font-bold text-purple-600 mt-2">{treeStats.leftSideCount || 0}</p>
+                  </div>
+                  <div className="bg-yellow-50 p-6 rounded-lg">
+                    <h4 className="font-semibold text-yellow-900">Right Side</h4>
+                    <p className="text-2xl font-bold text-yellow-600 mt-2">{treeStats.rightSideCount || 0}</p>
+                  </div>
+                </div>
+                
+                {/* Network Balance */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <h4 className="font-semibold text-gray-900 mb-4">Network Balance</h4>
+                  <div className="flex items-center space-x-4">
+                    <div className="flex-1">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>Left Side</span>
+                        <span>{treeStats?.leftSideCount || 0} members</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full" 
+                          style={{ 
+                            width: `${treeStats.totalDownline > 0 ? (treeStats.leftSideCount / treeStats.totalDownline) * 100 : 0}%` 
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>Right Side</span>
+                        <span>{treeStats?.rightSideCount || 0} members</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-green-600 h-2 rounded-full" 
+                          style={{ 
+                            width: `${treeStats.totalDownline > 0 ? (treeStats.rightSideCount / treeStats.totalDownline) * 100 : 0}%` 
+                          }}
+                        ></div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
+            {activeTab === 'tree' && (
+              <div>
+                {treeLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                    <p className="text-gray-500 mt-2">Loading tree data...</p>
+                  </div>
+                ) : (
+                <BinaryTreeVisualizer
+                  userId={user?.id || ''}
+                  treeData={treeData}
+                  showStats={true}
+                />
+                )}
+              </div>
+            )}
             {activeTab === 'earnings' && (
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Earnings Summary</h3>
@@ -216,30 +296,12 @@ const CustomerDashboard: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'genealogy' && (
+            {activeTab === 'referrals' && (
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Binary Tree Structure</h3>
-                <div className="bg-gray-50 p-8 rounded-lg text-center">
-                  <div className="inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg mb-4">
-                    You ({user?.sponsorshipNumber})
-                  </div>
-                  <div className="grid grid-cols-2 gap-8 mt-8">
-                    <div className="text-center">
-                      <h4 className="font-semibold text-gray-700 mb-2">Left Side</h4>
-                      <div className="bg-white p-4 rounded-lg border-2 border-dashed border-gray-300">
-                        <p className="text-gray-500">4 Members</p>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <h4 className="font-semibold text-gray-700 mb-2">Right Side</h4>
-                      <div className="bg-white p-4 rounded-lg border-2 border-dashed border-gray-300">
-                        <p className="text-gray-500">8 Members</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <ReferralLinkGenerator />
               </div>
             )}
+
           </div>
         </div>
       </div>
